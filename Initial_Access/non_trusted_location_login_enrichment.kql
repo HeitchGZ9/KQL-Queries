@@ -1,0 +1,32 @@
+//  Union of Signin Logs from Interactive and Non-Interactive Users as a variable.
+let NonTrustedLocationLogin =
+union
+    (SigninLogs
+     | extend DeviceDetailObj = DeviceDetail
+     | extend displayName = coalesce(tostring(DeviceDetailObj.displayName), "")
+     | extend deviceId = coalesce(tostring(DeviceDetailObj.deviceId), "")
+     | extend trustType = coalesce(tostring(DeviceDetailObj.trustType), "")),
+    (AADNonInteractiveUserSignInLogs
+     | extend DeviceDetailObj = parse_json(DeviceDetail)
+     | extend displayName = coalesce(tostring(DeviceDetailObj.displayName), "")
+     | extend deviceId = coalesce(tostring(DeviceDetailObj.deviceId), "")
+     | extend trustType = coalesce(tostring(DeviceDetailObj.trustType), ""))
+| where NetworkLocationDetails !has "trustedNamedLocation" 
+| extend 
+    authDetails = parse_json(AuthenticationDetails)
+| extend succeeded_ = iff(array_length(authDetails) > 0, tostring(authDetails[0].succeeded), "")
+| where succeeded_ == "true"
+| extend authenticationMethodDetail_ = iff(array_length(authDetails) > 0, tostring(authDetails[0].authenticationMethodDetail), "")
+| project TimeGenerated, UserPrincipalName, UserId, deviceId, displayName, trustType, IPAddress, ResultType, ResultSignature, ResultDescription, AppDisplayName, AuthenticationRequirement, AuthenticationProtocol, IsInteractive, ConditionalAccessStatus;
+// Threat Intelligence Indicators for IP's as a variable
+let TiIndicators =
+ThreatIntelIndicators
+| extend parsedData = parse_json(Data)
+| extend indicatorTypes = parsedData.indicator_types
+| where ObservableKey startswith "ipv4-addr" or ObservableKey startswith "ipv6-addr"
+| project TimeGenerated, Id, ObservableKey, IPAddress=ObservableValue, Tags, indicatorTypes, Confidence;
+// Join IP's from sign-ins with TI
+NonTrustedLocationLogin 
+| join kind=inner TiIndicators on IPAddress
+| project-away TimeGenerated1
+| sort by TimeGenerated desc
