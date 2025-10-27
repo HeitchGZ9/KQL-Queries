@@ -1,0 +1,20 @@
+// Pull exclusions from the watchlist and map relevant fields. change Excludedfield names for relevant names for human readability according to the exclusion entity type
+let exclusion_list = _GetWatchlist('Custom_Analytics_Exclusion_WatchList')
+| project SearchKey, ExcludedfieldX=Entity_1, ExcludedfieldX=Entity_2, ExcludedfieldX=Entity_3, ExcludedfieldX=Entity_4;
+// Analytic query logic
+Yourtable
+| where yourcolumn == "yourdata"
+// Tag this analytic for mapping to exclusions
+| extend AnalyticRuleName = "your_analytic_rule_name"
+// Exclusions of entities/////
+| join kind=leftanti (
+    exclusion_list
+) on
+    $left.AnalyticRuleName == $right.SearchKey and
+    $left.Column_to_excludeX == $right.ExcludedfieldX
+| join kind=leftanti (
+    exclusion_list
+) on
+    $left.AnalyticRuleName == $right.SearchKey and
+    $left.Column_to_excludeX == $right.ExcludedfieldX
+// Add more as needed...
