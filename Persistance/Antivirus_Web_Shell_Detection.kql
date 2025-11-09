@@ -1,0 +1,41 @@
+//Detection: Antivirus Web Shell Confirmation
+// Detects confirmed Antivirus/EDR detections on endpoints where the reported threat name 
+// matches known web shell or webshell-related trojan signatures. This is a critical indicator
+// of remote command and control establishment.
+//MITRE ATT&CK Mapping:
+// Tactic: Persistence (TA0003) / Defense Evasion (TA0005)
+// Technique 1: T1505.003 - Server Software Component: Web Shell (The primary action detected)
+/////////Query Logic/////////
+// Created list of parameters and Build the Regex
+let MaliciousWebShells_List = dynamic([
+    "Webshell", "Chopper", "SinoChoper", "ASPXSpy",
+    "Aspdoor", "filebrowser", "PHP_", "JSP_",
+    "ASP_", "PHP:", "JSP:", "ASP:",
+    "Perl:", "PHPShell", "Trojan.PHP", "Trojan.ASP",
+    "Trojan.JSP", "Trojan.VBS", "PHP Agent", "ASP Agent",
+    "JSP Agent", "VBS Agent", "Backdoor PHP", "Backdoor JSP",
+    "Backdoor ASP", "Backdoor VBS", "Backdoor Java", "PShlSpy"
+    ]);
+let WebshellRegex = strcat(".*(", strcat_array(MaliciousWebShells_List, "|"), ").*");
+DeviceEvents
+| where ActionType == "AntivirusDetection"
+| extend ThreatName = tostring(AdditionalFields.ThreatName)
+| extend DeviceName = tostring(split(DeviceName, ".")[0])
+// Use matches regex for the wildcard logic on the extended field
+| where ThreatName matches regex WebshellRegex 
+| project
+    TimeGenerated,
+    ThreatName,
+    DeviceName,
+    FileName,
+    InitiatingProcessFileName,
+    FolderPath,
+    SHA256,
+    InitiatingProcessAccountName,
+    InitiatingProcessCommandLine,
+    InitiatingProcessFolderPath,
+    ReportId,
+    AdditionalFields,
+    InitiatingProcessSHA256,
+    MachineGroup
+| order by TimeGenerated desc
